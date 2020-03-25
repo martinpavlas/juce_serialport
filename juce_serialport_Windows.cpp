@@ -50,7 +50,7 @@ public:
     DWORD  m_dwHeapFreeFlags;
 };
 
-String SerialPort::getSerialPortPath(unsigned int VID, unsigned PID)
+String SerialPort::getSerialPortPath(int vendorIdToMatch, int productIdToMatch)
 {
     const char *RegistryPath = "SYSTEM\\CurrentControlSet\\Enum\\USB";
 
@@ -87,7 +87,7 @@ String SerialPort::getSerialPortPath(unsigned int VID, unsigned PID)
                 continue;
             }
 
-            if (!((vendorId == VID) && (productId == PID))) {
+            if (!((vendorId == vendorIdToMatch) && (productId == productIdToMatch))) {
                 continue;
             }
 
