@@ -50,6 +50,76 @@ public:
     DWORD  m_dwHeapFreeFlags;
 };
 
+String SerialPort::getSerialPortPath(unsigned int VID, unsigned PID)
+{
+    const char *RegistryPath = "SYSTEM\\CurrentControlSet\\Enum\\USB";
+
+    HKEY hUSBDevices;
+    char usbDevice[MAX_PATH + 1];
+    LONG result;
+    char buff[MAX_PATH];
+
+    HKEY hUSBDeviceSerial;
+    DWORD serialNumberLength = MAX_PATH;
+    char serialNumber[MAX_PATH + 1];
+
+    HKEY hUSBDeviceSerialPortName;
+    DWORD serialPortNameLength = MAX_PATH;
+    char serialPortName[MAX_PATH + 1];
+
+    unsigned int vendorId = 0;
+    unsigned int productId = 0;
+    unsigned int interfaceNumber = 0;
+
+    String path;
+
+    if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, RegistryPath, 0, KEY_READ | KEY_ENUMERATE_SUB_KEYS, &hUSBDevices) == ERROR_SUCCESS)
+    {
+        for (DWORD index = 1; ; index++) {
+            DWORD usbDeviceLength = MAX_PATH;
+
+            result = RegEnumKeyEx(hUSBDevices, index, usbDevice, &usbDeviceLength, NULL, NULL, NULL, NULL);
+            if (result == ERROR_NO_MORE_ITEMS) {
+                break;
+            }
+
+            if (sscanf(usbDevice, "VID_%04x&PID_%04x&MI_%02u", &vendorId, &productId, &interfaceNumber) < 2) {
+                continue;
+            }
+
+            if (!((vendorId == VID) && (productId == PID))) {
+                continue;
+            }
+
+            sprintf(buff, "%s\\%s", RegistryPath, usbDevice);
+            if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, buff, 0, KEY_READ | KEY_ENUMERATE_SUB_KEYS, &hUSBDeviceSerial) == ERROR_SUCCESS) {
+              serialNumberLength = MAX_PATH;
+
+              for (DWORD index = 0; ; index++) {
+                  result = RegEnumKeyEx(hUSBDeviceSerial, index, serialNumber, &serialNumberLength, NULL, NULL, NULL, NULL);
+
+                  if (result == ERROR_NO_MORE_ITEMS) {
+                    break;
+                  }
+
+                  sprintf(buff, "%s\\%s\\%s\\Device Parameters", RegistryPath, usbDevice, serialNumber);
+                  serialPortName[0] = '\0';
+                  if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, buff, 0, KEY_READ, &hUSBDeviceSerialPortName) == ERROR_SUCCESS) {
+
+                      if (RegQueryValueEx(hUSBDeviceSerialPortName, "PortName", NULL, NULL, (LPBYTE)&serialPortName, &serialPortNameLength) == ERROR_SUCCESS) {
+                          RegCloseKey(hUSBDeviceSerialPortName);
+                          serialPortName[serialPortNameLength] = '\0';
+                          path = String("\\\\.\\") + String(serialPortName);
+                      }
+                  }
+              }
+          }
+       }
+    }
+
+    return (path);
+}
+
 StringPairArray SerialPort::getSerialPortPaths()
 {
     StringPairArray SerialPortPaths;
@@ -68,7 +138,7 @@ StringPairArray SerialPort::getSerialPortPaths()
             DWORD dwMaxValueDataSizeInChars = dwMaxValueLen / sizeof(TCHAR) + 1; //Include space for the NULL terminator
             DWORD dwMaxValueDataSizeInBytes = dwMaxValueDataSizeInChars * sizeof(TCHAR);
 
-            //Allocate some space for the value name and value data			
+            //Allocate some space for the value name and value data
             CAutoHeapAlloc valueName;
             CAutoHeapAlloc valueData;
             if (valueName.Allocate(dwMaxValueNameSizeInBytes) && valueData.Allocate(dwMaxValueDataSizeInBytes))
@@ -105,7 +175,7 @@ StringPairArray SerialPort::getSerialPortPaths()
                 SetLastError(ERROR_OUTOFMEMORY);
         }
 
-        //Close the registry key now that we are finished with it    
+        //Close the registry key now that we are finished with it
         RegCloseKey(hSERIALCOMM);
 
         if (dwQueryInfo != ERROR_SUCCESS)
@@ -114,7 +184,6 @@ StringPairArray SerialPort::getSerialPortPaths()
 
     return SerialPortPaths;
 }
-
 void SerialPort::close()
 {
     if (portHandle)
