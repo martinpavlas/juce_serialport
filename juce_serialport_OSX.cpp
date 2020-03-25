@@ -40,6 +40,34 @@ cleanup:
     return r;
 }
 
+static int getIoregistryValueString(io_service_t service, CFStringRef prop, char *rs)
+{
+    CFTypeRef data;
+    CFIndex size;
+    int r;
+
+    data = IORegistryEntryCreateCFProperty(service, prop, kCFAllocatorDefault, 0);
+    if (!data || CFGetTypeID(data) != CFStringGetTypeID()) {
+        r = 0;
+        goto cleanup;
+    }
+
+    size = CFStringGetMaximumSizeForEncoding(CFStringGetLength((CFStringRef)data),
+                                             kCFStringEncodingUTF8) + 1;
+
+    r = CFStringGetCString((CFStringRef)data, rs, size, kCFStringEncodingUTF8);
+    if (!r) {
+        r = 0;
+        goto cleanup;
+    }
+
+    r = 1;
+cleanup:
+    if (data)
+        CFRelease(data);
+    return r;
+}
+
 static io_object_t getParentAndRelease(io_service_t service, const io_name_t plane)
 {
     io_service_t parent;
@@ -53,17 +81,27 @@ static io_object_t getParentAndRelease(io_service_t service, const io_name_t pla
     return parent;
 }
 
-juce::String SerialPort::getSerialPortPath(int VID, int PID)
+static io_service_t findConformingParent(io_service_t service, const char *cls)
+{
+    IOObjectRetain(service);
+    do {
+        service = getParentAndRelease(service, kIOServicePlane);
+    } while (service && !IOObjectConformsTo(service, cls));
+
+    return service;
+}
+
+juce::String SerialPort::getSerialPortPath(int vendorIdToMatch, int productIdToMatch)
 {
     String SerialPortPath;
     io_iterator_t matchingServices;
-    mach_port_t         masterPort;
-    CFMutableDictionaryRef  classesToMatch;
-    io_object_t     modemService;
-    io_object_t     service;
+    mach_port_t masterPort;
+    CFMutableDictionaryRef classesToMatch;
+    io_object_t modemService;
+    io_object_t service;
     char deviceFilePath[512];
-    int vendorId;
-    int productId;
+    int16 vendorId;
+    int16 productId;
     
     if (KERN_SUCCESS != IOMasterPort(MACH_PORT_NULL, &masterPort))
     {
@@ -84,32 +122,23 @@ juce::String SerialPort::getSerialPortPath(int VID, int PID)
     }
     while ((modemService = IOIteratorNext(matchingServices)))
     {
-        CFTypeRef   deviceFilePathAsCFString;
-  
-        deviceFilePathAsCFString = IORegistryEntryCreateCFProperty(modemService,CFSTR(kIODialinDeviceKey), kCFAllocatorDefault, 0);
-        if(deviceFilePathAsCFString)
-        {
-            if(CFStringGetCString((const __CFString*)deviceFilePathAsCFString, deviceFilePath, 512, kCFStringEncodingASCII)) {
-                
-                IOObjectRetain(modemService);
-                do {
-                    service = getParentAndRelease(modemService, kIOServicePlane);
-                    if (service) {
-                        (void)getIoRegistryValueNumber(service, CFSTR("idVendor"), kCFNumberSInt16Type, &vendorId);
-                        (void)getIoRegistryValueNumber(service, CFSTR("idProduct"), kCFNumberSInt16Type, &productId);
-                        if ((vendorId == VID) && (productId == productId)) {
-                            DBG("Matched device: " << deviceFilePath);
-                            return (String(deviceFilePath));
-                        }
-                    }
-                } while (service);
+
+        service = findConformingParent(modemService, "IOUSBDevice");
+        
+        if (service) {
+            (void)getIoRegistryValueNumber(service, CFSTR("idVendor"), kCFNumberSInt16Type, &vendorId);
+            (void)getIoRegistryValueNumber(service, CFSTR("idProduct"), kCFNumberSInt16Type, &productId);
+            
+            if ((vendorId == vendorIdToMatch) && (productId == productIdToMatch)) {
+            (void)getIoregistryValueString(modemService, CFSTR(kIODialinDeviceKey), deviceFilePath);
+                DBG("VID = " << vendorId << " PID = " << productId << " path = " << deviceFilePath);
+                SerialPortPath = juce::String(deviceFilePath);
+                break;
             }
-            CFRelease(deviceFilePathAsCFString);
         }
     }
     IOObjectRelease(modemService);
     
-
     return SerialPortPath;
 }
 StringPairArray SerialPort::getSerialPortPaths()

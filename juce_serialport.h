@@ -118,7 +118,7 @@ public:
 	bool setConfig(const SerialPortConfig & config);
 	bool getConfig(SerialPortConfig & config);
 	juce::String getPortPath(){return portPath;}
-    static juce::String getSerialPortPath(int vendorId, int productId);
+    static juce::String getSerialPortPath(int vendorIdtoMatch, int productIdToMatch);
 	static juce::StringPairArray getSerialPortPaths();
 	bool exists();
 	juce_UseDebuggingNewOperator
