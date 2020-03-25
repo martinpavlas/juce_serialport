@@ -21,6 +21,97 @@
 
 #include "juce_serialport.h"
 
+
+static bool getIoRegistryValueNumber(io_service_t service, CFStringRef prop, CFNumberType type, void *rn)
+{
+    CFTypeRef data;
+    bool r;
+
+    data = IORegistryEntryCreateCFProperty(service, prop, kCFAllocatorDefault, 0);
+    if (!data || CFGetTypeID(data) != CFNumberGetTypeID()) {
+        r = false;
+        goto cleanup;
+    }
+
+    r = CFNumberGetValue((CFNumberRef)data, type, rn);
+cleanup:
+    if (data)
+        CFRelease(data);
+    return r;
+}
+
+static io_object_t getParentAndRelease(io_service_t service, const io_name_t plane)
+{
+    io_service_t parent;
+    kern_return_t kret;
+
+    kret = IORegistryEntryGetParentEntry(service, plane, &parent);
+    IOObjectRelease(service);
+    if (kret != kIOReturnSuccess)
+        return 0;
+
+    return parent;
+}
+
+juce::String SerialPort::getSerialPortPath(int VID, int PID)
+{
+    String SerialPortPath;
+    io_iterator_t matchingServices;
+    mach_port_t         masterPort;
+    CFMutableDictionaryRef  classesToMatch;
+    io_object_t     modemService;
+    io_object_t     service;
+    char deviceFilePath[512];
+    int vendorId;
+    int productId;
+    
+    if (KERN_SUCCESS != IOMasterPort(MACH_PORT_NULL, &masterPort))
+    {
+        DBG("SerialPort::getSerialPortPaths : IOMasterPort failed");
+        return SerialPortPath;
+    }
+    classesToMatch = IOServiceMatching(kIOSerialBSDServiceValue);
+    if (classesToMatch == NULL)
+    {
+        DBG("SerialPort::getSerialPortPaths : IOServiceMatching failed");
+        return SerialPortPath;
+    }
+    CFDictionarySetValue(classesToMatch, CFSTR(kIOSerialBSDTypeKey), CFSTR(kIOSerialBSDRS232Type));
+    if (KERN_SUCCESS != IOServiceGetMatchingServices(masterPort, classesToMatch, &matchingServices))
+    {
+        DBG("SerialPort::getSerialPortPaths : IOServiceGetMatchingServices failed");
+        return SerialPortPath;
+    }
+    while ((modemService = IOIteratorNext(matchingServices)))
+    {
+        CFTypeRef   deviceFilePathAsCFString;
+  
+        deviceFilePathAsCFString = IORegistryEntryCreateCFProperty(modemService,CFSTR(kIODialinDeviceKey), kCFAllocatorDefault, 0);
+        if(deviceFilePathAsCFString)
+        {
+            if(CFStringGetCString((const __CFString*)deviceFilePathAsCFString, deviceFilePath, 512, kCFStringEncodingASCII)) {
+                
+                IOObjectRetain(modemService);
+                do {
+                    service = getParentAndRelease(modemService, kIOServicePlane);
+                    if (service) {
+                        (void)getIoRegistryValueNumber(service, CFSTR("idVendor"), kCFNumberSInt16Type, &vendorId);
+                        (void)getIoRegistryValueNumber(service, CFSTR("idProduct"), kCFNumberSInt16Type, &productId);
+                        if ((vendorId == VID) && (productId == productId)) {
+                            DBG("Matched device: " << deviceFilePath);
+                            return (String(deviceFilePath));
+                        }
+                    }
+                } while (service);
+            }
+            CFRelease(deviceFilePathAsCFString);
+        }
+    }
+    IOObjectRelease(modemService);
+    
+
+    return SerialPortPath;
+}
 StringPairArray SerialPort::getSerialPortPaths()
 {
 	StringPairArray SerialPortPaths;
