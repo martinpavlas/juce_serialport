@@ -83,6 +83,9 @@ static io_object_t getParentAndRelease(io_service_t service, const io_name_t pla
 
 static io_service_t findConformingParent(io_service_t service, const char *cls)
 {
+    int16 vendorId;
+    int16 productId;
+    
     IOObjectRetain(service);
     do {
         service = getParentAndRelease(service, kIOServicePlane);
@@ -114,15 +117,16 @@ juce::String SerialPort::getSerialPortPath(int vendorIdToMatch, int productIdToM
         DBG("SerialPort::getSerialPortPaths : IOServiceMatching failed");
         return SerialPortPath;
     }
-    CFDictionarySetValue(classesToMatch, CFSTR(kIOSerialBSDTypeKey), CFSTR(kIOSerialBSDRS232Type));
+//    CFDictionarySetValue(classesToMatch, CFSTR(kIOSerialBSDTypeKey), CFSTR(kIOSerialBSDRS232Type));
+
     if (KERN_SUCCESS != IOServiceGetMatchingServices(masterPort, classesToMatch, &matchingServices))
     {
         DBG("SerialPort::getSerialPortPaths : IOServiceGetMatchingServices failed");
         return SerialPortPath;
     }
+
     while ((modemService = IOIteratorNext(matchingServices)))
     {
-
         service = findConformingParent(modemService, "IOUSBDevice");
         
         if (service) {
