@@ -67,9 +67,9 @@ String SerialPort::getSerialPortPath(int vendorIdToMatch, int productIdToMatch)
     DWORD serialPortNameLength = MAX_PATH;
     char serialPortName[MAX_PATH + 1];
 
-    unsigned int vendorId = 0;
-    unsigned int productId = 0;
-    unsigned int interfaceNumber = 0;
+    int vendorId = 0;
+    int productId = 0;
+    int interfaceNumber = 0;
 
     String path;
 
@@ -369,6 +369,7 @@ void SerialPortInputStream::run()
         const auto wceReturn = WaitCommEvent(port->portHandle, &dwEventMask, &ov);
         if (wceReturn == 0 && GetLastError () != ERROR_IO_PENDING)
         {
+            DBG("Still here");
             port->close ();
             break;
         }
