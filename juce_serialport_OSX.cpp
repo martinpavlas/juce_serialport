@@ -82,10 +82,7 @@ static io_object_t getParentAndRelease(io_service_t service, const io_name_t pla
 }
 
 static io_service_t findConformingParent(io_service_t service, const char *cls)
-{
-    int16 vendorId;
-    int16 productId;
-    
+{    
     IOObjectRetain(service);
     do {
         service = getParentAndRelease(service, kIOServicePlane);
