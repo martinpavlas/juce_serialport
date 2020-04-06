@@ -353,8 +353,11 @@ bool SerialPort::getConfig(SerialPortConfig & config)
 /////////////////////////////////
 void SerialPortInputStream::run()
 {
-	while(port && (port->portDescriptor!=-1) && !threadShouldExit())
+	while(!threadShouldExit())
 	{
+        if (!port || port->portDescriptor == -1)
+            continue;
+        
 		unsigned char c;
 		int bytesread=0;
 		bytesread = ::read(port->portDescriptor, &c, 1);
@@ -367,11 +370,6 @@ void SerialPortInputStream::run()
 			if(notify==NOTIFY_ALWAYS||((notify==NOTIFY_ON_CHAR) && (c == notifyChar)))
 					sendChangeMessage();
 		}
-        else if (bytesread == -1)
-        {
-            port->close ();
-            break;
-        }
 	}
 }
 int SerialPortInputStream::read(void *destBuffer, int maxBytesToRead)

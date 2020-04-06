@@ -364,6 +364,9 @@ void SerialPortInputStream::run()
     ovRead.hEvent = CreateEvent(0, true, 0, 0);
     while (port && port->portHandle && !threadShouldExit())
     {
+        if (!port || !port->portHandle)
+            continue;
+        
         unsigned char c;
         DWORD bytesread = 0;
         const auto wceReturn = WaitCommEvent(port->portHandle, &dwEventMask, &ov);

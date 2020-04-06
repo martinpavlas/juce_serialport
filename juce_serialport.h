@@ -133,7 +133,7 @@ private:
 class JUCE_API SerialPortInputStream : public juce::InputStream, public juce::ChangeBroadcaster, private juce::Thread
 {
 public:
-    SerialPortInputStream(SerialPort * port)
+    SerialPortInputStream(SerialPort * port = NULL)
     :Thread("SerialInThread"), port(port),bufferedbytes(0), notify(NOTIFY_OFF), notifyChar(0)
 	{
 		startThread();
@@ -190,6 +190,7 @@ public:
 	};
 	virtual juce::int64 getPosition(){return -1;}
 	virtual bool setPosition(juce::int64 /*newPosition*/){return false;}
+    void setPort(SerialPort *port) { this->port = port; }
     SerialPort* getPort() { return port; }
 private:
 	SerialPort * port;
