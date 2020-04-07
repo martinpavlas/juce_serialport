@@ -362,9 +362,10 @@ void SerialPortInputStream::run()
     OVERLAPPED ovRead;
     memset(&ovRead, 0, sizeof(ovRead));
     ovRead.hEvent = CreateEvent(0, true, 0, 0);
-    while (port && port->portHandle && !threadShouldExit())
+    while (!threadShouldExit())
     {
-        if (!port || !port->portHandle)
+        //DBG("run");
+        if (!port || port->portHandle == 0)
             continue;
         
         unsigned char c;
@@ -372,9 +373,9 @@ void SerialPortInputStream::run()
         const auto wceReturn = WaitCommEvent(port->portHandle, &dwEventMask, &ov);
         if (wceReturn == 0 && GetLastError () != ERROR_IO_PENDING)
         {
-            DBG("Still here");
-            port->close ();
-            break;
+            //DBG("Still here");
+            //port->close ();
+            //break;
         }
 
         if (WAIT_OBJECT_0 == WaitForSingleObject(ov.hEvent, 100))

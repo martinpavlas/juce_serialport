@@ -190,7 +190,7 @@ public:
 	};
 	virtual juce::int64 getPosition(){return -1;}
 	virtual bool setPosition(juce::int64 /*newPosition*/){return false;}
-    void setPort(SerialPort *port) { this->port = port; }
+    void setPort(SerialPort *inPort) { this->port = inPort; }
     SerialPort* getPort() { return port; }
 private:
 	SerialPort * port;
